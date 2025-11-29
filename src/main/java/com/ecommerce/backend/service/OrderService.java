@@ -1,38 +1,44 @@
 package com.ecommerce.backend.service;
 
-import com.ecommerce.backend.domain.User;
-import com.ecommerce.backend.repository.o;
+import com.ecommerce.backend.document.Order;
+import com.ecommerce.backend.document.Outbox;
+import com.ecommerce.backend.dto.OrderRequest;
+import com.ecommerce.backend.repository.OrderRepository;
+import com.ecommerce.backend.repository.OutboxRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-
-import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
 
-    private final OrderR userRepository;
+    private final OrderRepository orderRepository;
+    private final OutboxRepository outboxRepository;
+    private final ObjectMapper objectMapper;
 
 
-    @Transactional
-    public void createUser(String username, String password) {
-        if (userRepository.findByUsername(username).isPresent()) {
-            throw new IllegalArgumentException("User with name " + username + " already exists.");
+    public void createOrder(OrderRequest orderRequest) {
+        for (com.ecommerce.backend.dto.Order order : orderRequest.getOrders()) {
+            Order orderEntity = Order.builder()
+                    .username(order.getUsername())
+                    .productId(order.getProductId())
+                    .quantity(order.getQuantity())
+                    .build();
+            orderRepository.save(orderEntity);
+
+            try {
+                String payload = objectMapper.writeValueAsString(orderEntity);
+                Outbox outbox = Outbox.builder()
+                        .aggregateId(orderEntity.getId())
+                        .payload(payload)
+                        .build();
+                outboxRepository.save(outbox);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException("Error serializing order", e);
+            }
         }
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(password);
-        user.setRoles(List.of("USER"));
-        userRepository.save(user);
-    }
-
-    @Transactional
-    public void deleteUser(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("User with name " + username + " not found."));
-        userRepository.delete(user);
     }
 }

@@ -18,12 +18,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import net.devh.boot.grpc.server.security.authentication.GrpcAuthenticationReader;
-import net.devh.boot.grpc.server.security.check.AccessPredicate;
-import net.devh.boot.grpc.server.security.check.GrpcSecurityMetadataSource;
-import net.devh.boot.grpc.server.security.check.ManualGrpcSecurityMetadataSource;
-import net.devh.boot.grpc.server.security.authentication.BearerAuthenticationReader;
-import com.ecommerce.backend.grpc.AuthServiceGrpc;
 
 @Configuration
 @EnableWebSecurity
@@ -34,14 +28,12 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
 
-
-
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .anyRequest().authenticated()
+                        .requestMatchers("/api/orders").authenticated()
+                        .anyRequest().permitAll()
                 )
                 .csrf(AbstractHttpConfigurer::disable)
                 .headers(headers -> headers
@@ -52,7 +44,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(jwtAuthenticationEntryPoint)
                         .accessDeniedHandler(customAccessDeniedHandler)
                 )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider, redisService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
@@ -61,5 +53,8 @@ public class SecurityConfig {
         return configuration.getAuthenticationManager();
     }
 
-
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 }

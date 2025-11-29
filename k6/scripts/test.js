@@ -2,68 +2,121 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 export let options = {
-    vus: 300,
-    duration: '10s',
+    stages: [
+        { duration: '10s', target: 30 },
+        { duration: '20s', target: 30 },
+        { duration: '10s', target: 0 },
+    ],
+    thresholds: {
+        'http_req_duration': ['p(95)<200'],
+        'http_req_failed': ['rate<0.01'],
+    },
 };
 
 export default function () {
-    const username = `testuser${__VU}`;
-    const credentials = {
-        username: username,
-        password: 'password',
-    };
+    // 항상 유니크한 username 생성
+    const username = `testuser_${__VU}_${__ITER}_${Date.now()}`;
+    const password = 'password123';
 
-    const loginRes = http.post('http://localhost:8081/auth/login', JSON.stringify(credentials), {
-        headers: { 'Content-Type': 'application/json' },
+    // 1. Create a user
+    const createUserPayload = JSON.stringify({
+        username: username,
+        password: password,
     });
 
-    check(loginRes, { 'login successful': (r) => r.status === 200 });
+    const createUserParams = {
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
+
+    const createUserRes = http.post('http://localhost:8080/users', createUserPayload, createUserParams);
+
+    check(createUserRes, {
+        'User creation successful': (r) => r.status === 201,
+    });
+
+    if (createUserRes.status !== 201) {
+        console.error(`❌ User creation failed for ${username}: ${createUserRes.status} ${createUserRes.body}`);
+        return;
+    }
+
+    const userId = createUserRes.json('id');
+    console.log(`✅ User creation successful for ${username}. User ID: ${userId}`);
+    sleep(1);
+
+    // 2. Login to get a token
+    const loginPayload = JSON.stringify({
+        username: username,
+        password: password,
+    });
+
+    const loginParams = {
+        headers: {
+            'Content-Type': 'application/json',
+        },
+    };
+
+    const loginRes = http.post('http://localhost:8081/auth/login', loginPayload, loginParams);
+
+    check(loginRes, {
+        'Login successful': (r) => r.status === 200,
+    });
 
     if (loginRes.status !== 200) {
         console.error(`❌ Login failed for ${username}: ${loginRes.status} ${loginRes.body}`);
         return;
     }
 
-    let accessToken = loginRes.json('accessToken');
-    const refreshToken = loginRes.json('refreshToken');
+    const accessToken = loginRes.json('accessToken');
+    console.log('✖️',accessToken);
     console.log(`✅ Login successful for ${username}`);
-
     sleep(1);
 
-    const jar = http.cookieJar();
-    jar.set('http://localhost:8081', 'refreshToken', refreshToken);
-
-    const refreshRes = http.post('http://localhost:8081/auth/refresh', null, {
-        headers: { 'Content-Type': 'application/json' },
-        cookies: jar.cookiesForURL('http://localhost:8081'),
-    });
-
-    check(refreshRes, { 'token refresh successful': (r) => r.status === 200 });
-
-    if (refreshRes.status === 200) {
-        accessToken = refreshRes.json('accessToken');
-        console.log(`🔄 Access token refreshed for ${username}`);
-    } else {
-        console.error(`❌ Failed to refresh token for ${username}: ${refreshRes.status} ${refreshRes.body}`);
-    }
-
-    sleep(1);
-
-    const logoutRes = http.post('http://localhost:8081/auth/logout', null, {
+    // 3. Get user info
+    // 3. Create order
+    const authHeaders = {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         },
-        cookies: jar.cookiesForURL('http://localhost:8081'),
+    };
+
+// 주문 데이터 예시
+    const orderPayload = JSON.stringify({
+        orders: [{
+            username: username,
+            productId: "123",
+            quantity: 2
+        }]
     });
 
-    check(logoutRes, { 'logout successful': (r) => r.status === 200 });
+    const orderRes = http.post('http://localhost:8082/orders', orderPayload, authHeaders);
 
-    if (logoutRes.status === 200) {
-        console.log(`👋 Logout successful for ${username}`);
+    check(orderRes, {
+        'Order request successful': (r) => r.status === 201 || r.status === 200,
+
+    });
+
+    if (orderRes.status === 201 || orderRes.status === 200) {
+        console.log(`✅ Order successful for ${username}`);
     } else {
-        console.error(`❌ Logout failed for ${username}: ${logoutRes.status} ${logoutRes.body}`);
+        console.error(`❌ Order failed for ${username}: ${orderRes.status} ${orderRes.body}`);
     }
 
+    sleep(1);
+
+    // 4. Delete user
+    const deleteRes = http.del(`http://localhost:8080/users/me`, null, authHeaders);
+
+    check(deleteRes, {
+        'Delete user successful': (r) => r.status === 204,
+    });
+
+    if (deleteRes.status === 204) {
+        console.log(`✅ Delete user successful for ${username}`);
+    } else {
+        console.error(`❌ Delete user failed for ${username}: ${deleteRes.status} ${deleteRes.body}`);
+    }
     sleep(1);
 }
