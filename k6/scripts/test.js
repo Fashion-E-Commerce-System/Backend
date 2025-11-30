@@ -83,13 +83,13 @@ export default function () {
     };
 
 // 주문 데이터 예시
-    const orderPayload = JSON.stringify({
-        orders: [{
-            username: username,
-            productId: "123",
-            quantity: 2
-        }]
-    });
+    const orderPayload = JSON.stringify([{
+        productId: "123",
+        quantity: 2
+    },{
+        productId: "1233",
+        quantity: 21
+    }]);
 
     const orderRes = http.post('http://localhost:8082/orders', orderPayload, authHeaders);
 

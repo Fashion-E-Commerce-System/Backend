@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/orders")
 @RequiredArgsConstructor
@@ -20,8 +22,8 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public ResponseEntity<Void> createOrder(@RequestBody OrderRequest orderRequest, @AuthenticationPrincipal String username) {
-        orderService.createOrder(orderRequest, username);
+    public ResponseEntity<Void> createOrders(@RequestBody List<OrderRequest> orderRequests, @AuthenticationPrincipal String username) {
+        orderService.createOrders(orderRequests, username);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }

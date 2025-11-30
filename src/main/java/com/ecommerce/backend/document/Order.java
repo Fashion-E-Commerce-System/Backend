@@ -1,28 +1,26 @@
 package com.ecommerce.backend.document;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.CreatedDate;
+import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Builder
 @Document(collection = "orders")
+@Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
+@Setter
+@Getter
 public class Order {
     @Id
     private String id;
+
     private String username;
-    private String productId;
-    private Integer quantity;
 
-    @CreatedDate
-    private LocalDateTime createdAt;
+    private LocalDateTime date;
+
+    private List<OrderItem> orders;
 }
-
